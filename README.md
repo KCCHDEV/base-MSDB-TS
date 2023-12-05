@@ -56,8 +56,8 @@ console.log('รายการที่ตรงตามเงื่อนไ�
 
 ## RAW Code
 ```ts
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from "fs";
+import path from "path";
 
 class Table {
     private tableData: Record<string, any>;
