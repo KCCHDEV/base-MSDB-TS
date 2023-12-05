@@ -1,5 +1,5 @@
-import * as fs from 'fs';
-import * as path from 'path';
+import fs from "fs";
+import path from "path";
 
 class Table {
     private tableData: Record<string, any>;
@@ -9,7 +9,6 @@ class Table {
         this.tableFilename = tableFilename;
         this.tableData = this.loadTableData();
     }
-
     private loadTableData(): Record<string, any> {
         if (fs.existsSync(this.tableFilename)) {
             const data = fs.readFileSync(this.tableFilename, 'utf8');
@@ -50,7 +49,6 @@ class Table {
         const randomKey = keys[Math.floor(Math.random() * keys.length)];
         return this.tableData[randomKey];
     }
-
     getAll(orderBy: 'asc' | 'desc' = 'asc'): any[] {
         const entries = Object.values(this.tableData);
 
