@@ -1,170 +1,92 @@
-# base-MSDB-TS (MSDBTS V1.5)
+# 🗄️ base-MSDB-TS (MSDBTS V17)
 
-## Requirement for MSDB
+A lightweight, file-based database system for TypeScript projects with caching and debug capabilities.
+ระบบฐานข้อมูลแบบไฟล์ที่มีน้ำหนักเบาสำหรับโปรเจค TypeScript พร้อมระบบแคชและการดีบัก
+
+## 📋 Requirements / ความต้องการระบบ
+
+Install one of the following package managers and required dependencies:
+ติดตั้งตัวจัดการแพ็คเกจตัวใดตัวหนึ่งและแพ็คเกจที่จำเป็น:
 
 ```bash
+# Using npm
 npm i --save fs path @types/node
-OR
+
+# Using pnpm
 pnpm i --save fs path @types/node
-OR
+
+# Using bun
 bun i fs path @types/node
-OR 
-yarn i fs path @types/node
+
+# Using yarn
+yarn add fs path @types/node
 ```
 
+## 🚀 Features / คุณสมบัติ
 
-## how to use (TypeScrip)
-```ts
-import Database from './msdb';
+- 📦 File-based storage / การจัดเก็บแบบไฟล์
+- 🔄 Automatic data partitioning / การแบ่งข้อมูลอัตโนมัติ
+- ⚡ Caching system / ระบบแคช
+- 🐛 Debug logging / การบันทึกการดีบัก
+- 🔍 Flexible querying / การค้นหาข้อมูลที่ยืดหยุ่น
 
-// สร้างอ็อบเจ็กต์ใหม่ของคลาส Database
-const myDatabase = new Database('myDatabase');
+## 📖 Usage / วิธีการใช้งาน
 
-// สร้างตารางในฐานข้อมูล
-const myTable = myDatabase.table('myTable');
+### Basic Example / ตัวอย่างการใช้งานพื้นฐาน
 
-// บันทึกรายการในตาราง
+```typescript
+import initializeDatabase from './msdb';
+
+// Initialize database / สร้างฐานข้อมูล
+const myDatabase = initializeDatabase('myDatabase');
+const myTable = myDatabase('myTable');
+
+// Save data / บันทึกข้อมูล
 myTable.save('key1', { value: 'value1' });
 myTable.save('key2', { value: 'value2' });
 myTable.save('key3', { value: 'value3' });
 
-// ค้นหารายการและพิมพ์ข้อมูล
+// Find entry / ค้นหาข้อมูล
 const foundEntry = myTable.find('key1');
-console.log('พบรายการ:', foundEntry);
+console.log('Found entry:', foundEntry);
 
-// ลบรายการจากตาราง
+// Remove entry / ลบข้อมูล
 myTable.remove('key2');
-console.log('ตารางหลังการลบ key2:', myTable.getAll());
 
-// ดึงข้อมูลจากรายการที่สุ่ม
+// Get random entry / ดึงข้อมูลแบบสุ่ม
 const randomEntry = myTable.random();
-console.log('รายการสุ่ม:', randomEntry);
 
-// ดึงข้อมูลทั้งหมดในลำดับน้อยไปสูง
-const allEntriesAsc = myTable.getAll();
-console.log('รายการทั้งหมด (ลำดับน้อยไปสูง):', allEntriesAsc);
+// Get all entries (ascending) / ดึงข้อมูลทั้งหมด (เรียงจากน้อยไปมาก)
+const allEntriesAsc = myTable.getAll('asc');
 
-// ดึงข้อมูลทั้งหมดในลำดับสูงไปน้อย
+// Get all entries (descending) / ดึงข้อมูลทั้งหมด (เรียงจากมากไปน้อย)
 const allEntriesDesc = myTable.getAll('desc');
-console.log('รายการทั้งหมด (ลำดับสูงไปน้อย):', allEntriesDesc);
 
-// ดึงข้อมูลที่ตรงตามเงื่อนไข
+// Query with condition / ค้นหาด้วยเงื่อนไข
 const condition = { value: 'value1' };
 const entriesWithCondition = myTable.getWhere(condition);
-console.log('รายการที่ตรงตามเงื่อนไข:', entriesWithCondition);
 ```
 
-## RAW Code
-```ts
-import fs from "fs";
-import path from "path";
+### 🔧 Advanced Features / คุณสมบัติขั้นสูง
 
-class Table {
-    private tableData: Record<string, any>;
-    private tableFilename: string;
+#### Caching / ระบบแคช
+- Automatically caches up to 1000 entries
+- Flushes to disk when cache limit is reached
+- อัตโนมัติแคชสูงสุด 1000 รายการ
+- บันทึกลงดิสก์เมื่อถึงขีดจำกัดแคช
 
-    constructor(tableFilename: string) {
-        this.tableFilename = tableFilename;
-        this.tableData = this.loadTableData();
-    }
+#### Debug Logging / การบันทึกการดีบัก
+- Enable debug mode to log operations
+- Logs stored in debug.log file
+- เปิดใช้งานโหมดดีบักเพื่อบันทึกการทำงาน
+- บันทึกถูกเก็บในไฟล์ debug.log
 
-    private loadTableData(): Record<string, any> {
-        if (fs.existsSync(this.tableFilename)) {
-            const data = fs.readFileSync(this.tableFilename, 'utf8');
-            return JSON.parse(data);
-        }
-        return {};
-    }
+## 🤝 Contributing / การมีส่วนร่วม
 
-    private saveTableData(): void {
-        const jsonData = JSON.stringify(this.tableData, null, 2);
-        fs.writeFileSync(this.tableFilename, jsonData, 'utf8');
-    }
+Contributions are welcome! Please feel free to submit a Pull Request.
+ยินดีรับการมีส่วนร่วม! โปรดส่ง Pull Request ได้อย่างอิสระ
 
-    save(id: string, data: any): void {
-        this.tableData[id] = {
-            id,
-            value: data.value || data || null,
-        };
-        this.saveTableData();
-    }
+## 📄 License / ลิขสิทธิ์
 
-    remove(id: string): void {
-        if (this.tableData.hasOwnProperty(id)) {
-            delete this.tableData[id];
-            this.saveTableData();
-        }
-    }
-
-    find(id: string): any {
-        return this.tableData[id];
-    }
-
-    random(): any | null {
-        const keys = Object.keys(this.tableData);
-        if (keys.length === 0) {
-            return null;
-        }
-        const randomKey = keys[Math.floor(Math.random() * keys.length)];
-        return this.tableData[randomKey];
-    }
-
-    getAll(orderBy: 'asc' | 'desc' = 'asc'): any[] {
-        const entries = Object.values(this.tableData);
-
-        if (orderBy === 'desc') {
-            entries.sort((a, b) => (a.id > b.id ? -1 : 1));
-        } else {
-            entries.sort((a, b) => (a.id > b.id ? 1 : -1));
-        }
-
-        return entries;
-    }
-
-    getWhere(condition: Record<string, any>): any[] {
-        const entries = Object.values(this.tableData);
-        return entries.filter(entry => {
-            for (const key in condition) {
-                if (entry[key] !== condition[key]) {
-                    return false;
-                }
-            }
-            return true;
-        });
-    }
-}
-
-class Database {
-    private readonly databaseFolderPath: string;
-    private readonly fullDatabaseFolderPath: string;
-
-    constructor(databaseName: string) {
-        this.databaseFolderPath = path.resolve(__dirname, 'MakiShop_Database');
-        if (!fs.existsSync(this.databaseFolderPath)) {
-            try {
-                fs.mkdirSync(this.databaseFolderPath);
-                console.log(`Database folder created at: ${this.databaseFolderPath}`);
-            } catch (error) {
-                console.error('Error creating database folder:', error);
-            }
-        }
-        this.fullDatabaseFolderPath = path.join(this.databaseFolderPath, databaseName);
-        if (!fs.existsSync(this.fullDatabaseFolderPath)) {
-            try {
-                fs.mkdirSync(this.fullDatabaseFolderPath);
-                console.log(`Database folder created at: ${this.fullDatabaseFolderPath}`);
-            } catch (error) {
-                console.error('Error creating full database folder:', error);
-            }
-        }
-    }
-
-    table(tableName: string): Table {
-        const tableFilename = path.join(this.fullDatabaseFolderPath, `${tableName}.json`);
-        return new Table(tableFilename);
-    }
-}
-
-export default Database;
-
-```
+MIT License
+ลิขสิทธิ์ MIT
