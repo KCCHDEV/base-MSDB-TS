@@ -1,37 +1,38 @@
-import Database from './msdb';
+import initializeDatabase from './msdb';
 
-// สร้างอ็อบเจ็กต์ใหม่ของคลาส Database
-const myDatabase = new Database('myDatabase');
+// Initialize the database with debug mode
+const myDatabase = initializeDatabase('myDatabase');
+const myTable = myDatabase('myTable');
 
-// สร้างตารางในฐานข้อมูล
-const myTable = myDatabase.table('myTable');
+console.log('Starting database operations...');
 
-// บันทึกรายการในตาราง
-myTable.save('key1', { value: 'value1' });
-myTable.save('key2', { value: 'value2' });
-myTable.save('key3', { value: 'value3' });
+// Save a batch of entries
+const entries = [
+  { id: 'entry1', data: { name: 'John Doe', age: 30 } },
+  { id: 'entry2', data: { name: 'Jane Doe', age: 25 } },
+  { id: 'entry3', data: { name: 'Bob Smith', age: 45 } }
+];
 
-// ค้นหารายการและพิมพ์ข้อมูล
-const foundEntry = myTable.find('key1');
-console.log('พบรายการ:', foundEntry);
+entries.forEach(({ id, data }) => {
+  myTable.save(id, data);
+});
 
-// ลบรายการจากตาราง
-myTable.remove('key2');
-console.log('ตารางหลังการลบ key2:', myTable.getAll());
+// Retrieve an entry by ID
+const retrievedEntry = myTable.find('entry1');
+console.log('Retrieved Entry:', retrievedEntry);
 
-// ดึงข้อมูลจากรายการที่สุ่ม
-const randomEntry = myTable.random();
-console.log('รายการสุ่ม:', randomEntry);
+// Update an existing entry
+myTable.save('entry1', { name: 'John Doe', age: 31 });
 
-// ดึงข้อมูลทั้งหมดในลำดับน้อยไปสูง
-const allEntriesAsc = myTable.getAll();
-console.log('รายการทั้งหมด (ลำดับน้อยไปสูง):', allEntriesAsc);
+// Retrieve all entries with pagination
+const allEntries = myTable.getAll('asc');
+console.log('All Entries:', allEntries);
 
-// ดึงข้อมูลทั้งหมดในลำดับสูงไปน้อย
-const allEntriesDesc = myTable.getAll('desc');
-console.log('รายการทั้งหมด (ลำดับสูงไปน้อย):', allEntriesDesc);
+// Find entries with specific conditions
+const filteredEntries = myTable.getWhere({ age: 31 });
+console.log('Filtered Entries:', filteredEntries);
 
-// ดึงข้อมูลที่ตรงตามเงื่อนไข
-const condition = { value: 'value1' };
-const entriesWithCondition = myTable.getWhere(condition);
-console.log('รายการที่ตรงตามเงื่อนไข:', entriesWithCondition);
+// Remove an entry
+myTable.remove('entry1');
+
+console.log('Database operations completed.'); 

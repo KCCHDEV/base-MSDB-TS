@@ -1,7 +1,15 @@
 import fs from 'fs';
 import path from 'path';
 
-const PART_SIZE = 1000; // Number of entries per file part
+const PART_SIZE = 5000; // Number of entries per file part
+const DEBUG = true; // Set to true to enable debug logging
+const CACHE_LIMIT = 1000; // Cache limit before flushing to disk
+
+function logDebug(message: string) {
+  if (DEBUG) {
+    fs.appendFileSync('debug.log', `${new Date().toISOString()} - ${message}\n`);
+  }
+}
 
 /**
  * Creates and initializes a database with the given name.
@@ -27,6 +35,7 @@ function initializeDatabase(databaseName: string) {
     }
 
     let tableData: Record<string, any> = loadTableData();
+    let cache: Record<string, any> = {};
 
     /**
      * Loads all table data from partitioned files.
@@ -42,6 +51,7 @@ function initializeDatabase(databaseName: string) {
         Object.assign(data, fileData);
       }
 
+      logDebug(`Loaded table data for ${tableName}`);
       return data;
     }
 
@@ -62,6 +72,8 @@ function initializeDatabase(databaseName: string) {
       for (const file of existingFiles.slice(requiredFileCount)) {
         fs.unlinkSync(path.join(tableFolderPath, file));
       }
+
+      logDebug(`Saved table data for ${tableName}`);
     }
 
     /**
@@ -72,7 +84,13 @@ function initializeDatabase(databaseName: string) {
     function saveEntry(id: string, data: any) {
       const entryId = id || generateUniqueId();
       tableData[entryId] = { id: entryId, value: data };
-      saveTableData();
+      cache[entryId] = tableData[entryId];
+
+      if (Object.keys(cache).length >= CACHE_LIMIT) {
+        saveTableData();
+        cache = {};
+        logDebug(`Cache flushed for ${tableName}`);
+      }
     }
 
     /**
@@ -83,6 +101,7 @@ function initializeDatabase(databaseName: string) {
       if (tableData[id]) {
         delete tableData[id];
         saveTableData();
+        logDebug(`Removed entry ${id} from ${tableName}`);
       }
     }
 
@@ -92,7 +111,9 @@ function initializeDatabase(databaseName: string) {
      * @returns {object|null} - The entry, or null if not found.
      */
     function getEntry(id: string) {
-      return tableData[id] || null;
+      const entry = tableData[id] || null;
+      logDebug(`Retrieved entry ${id} from ${tableName}`);
+      return entry;
     }
 
     /**
@@ -102,7 +123,9 @@ function initializeDatabase(databaseName: string) {
      */
     function getAllEntries(orderBy = 'asc') {
       const entries = Object.values(tableData);
-      return entries.sort((a, b) => (orderBy === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id)));
+      const result = entries.sort((a, b) => (orderBy === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id)));
+      logDebug(`Retrieved all entries from ${tableName} ordered by ${orderBy}`);
+      return result;
     }
 
     /**
@@ -111,12 +134,14 @@ function initializeDatabase(databaseName: string) {
      * @returns {object[]} - An array of matching entries.
      */
     function getWhere(condition: { [key: string]: any }) {
-      return Object.values(tableData).filter((entry) => {
+      const result = Object.values(tableData).filter((entry) => {
         for (const key in condition) {
           if (entry.value[key] !== condition[key]) return false;
         }
         return true;
       });
+      logDebug(`Retrieved entries from ${tableName} with condition ${JSON.stringify(condition)}`);
+      return result;
     }
 
     /**
@@ -127,7 +152,9 @@ function initializeDatabase(databaseName: string) {
       const keys = Object.keys(tableData);
       if (keys.length === 0) return null;
       const randomKey = keys[Math.floor(Math.random() * keys.length)];
-      return tableData[randomKey];
+      const entry = tableData[randomKey];
+      logDebug(`Retrieved random entry from ${tableName}`);
+      return entry;
     }
 
     return {
