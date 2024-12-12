@@ -3,8 +3,8 @@ import initializeDatabase from './msdb';
 const myDatabase = initializeDatabase('largeTestDatabase');
 const myTable = myDatabase('largeTestTable');
 
-const numberOfEntries = 100000;
-const batchSize = 1000; // Match the cache limit
+const numberOfEntries = 1000000;
+const batchSize = 2500; // Match the cache limit
 
 console.log(`Starting to insert ${numberOfEntries} entries in batches of ${batchSize}...`);
 console.time('Total Insertion Time');
