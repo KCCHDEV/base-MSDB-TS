@@ -2,6 +2,20 @@
 
 [English](#english-documentation) | [ภาษาไทย](#thai-documentation)
 
+## Latest Updates (V17)
+- Added file locking mechanism for better concurrency
+- Improved error handling and recovery
+- Enhanced batch operations
+- Better memory management
+- New transaction-like batch operations
+
+## Performance Recommendations
+- Use batch operations for multiple saves
+- Enable proper logging in production
+- Configure cache size based on your needs
+- Use proper error handling
+- Implement cooldown periods between large operations
+
 Quick Navigation / การนำทางด่วน:
 - [Installation / การติดตั้ง](#installation--การติดตั้ง)
 - [Basic Usage / การใช้งานพื้นฐาน](#basic-usage--การใช้งานพื้นฐาน)
@@ -13,6 +27,10 @@ Quick Navigation / การนำทางด่วน:
 # English Documentation
 
 ## Installation / การติดตั้ง
+
+```bash
+npm install base-msdb-ts
+```
 
 1. Create a new TypeScript project:
 ```bash
@@ -44,57 +62,74 @@ src/
 }
 ```
 
-## Basic Usage
+## Basic Usage with Error Handling
 
 ```typescript
-import initializeDatabase from './msdb';
+import initializeDatabase from 'base-msdb-ts';
 
-// 1. Create a database
-const db = initializeDatabase('myShop');
-
-// 2. Define your data structure
-interface Product {
+// Define your data structure
+interface User {
     name: string;
-    price: number;
-    stock: number;
+    age: number;
+    email?: string;
 }
 
-// 3. Create a table with type safety
-const products = db<Product>('products');
+// Initialize with error handling
+try {
+    const db = initializeDatabase('myApp');
+    const users = db<User>('users');
 
-// 4. Add data
-products.save('apple', {
-    name: 'Apple',
-    price: 0.5,
-    stock: 100
-});
+    // Configure for your needs
+    users.config.setCacheLimit(1000);
+    users.config.setCacheSizeMB(100);
 
-// 5. Query data
-const apple = products.find('apple');
-const cheapProducts = products.getWhere({ price: 0.5 });
-const allProducts = products.getAll('asc');
+    // Save with proper error handling
+    await users.save('user1', {
+        name: 'John',
+        age: 30,
+        email: 'john@example.com'
+    });
+} catch (error) {
+    console.error('Database operation failed:', error);
+}
 ```
 
 ## Advanced Features
 
+### Batch Operations
 ```typescript
-// Enable logging
-products.config.toggleLogging(true);
-products.config.setLogFile('shop.log');
+async function batchSave(users: User[]) {
+    const results = [];
+    for (const user of users) {
+        try {
+            await users.save(generateId(), user);
+            results.push(true);
+        } catch (error) {
+            results.push(false);
+            console.error('Failed to save user:', error);
+        }
+    }
+    return results;
+}
+```
 
-// Batch operations
-const fruits = [
-    { name: 'Orange', price: 0.6, stock: 80 },
-    { name: 'Banana', price: 0.3, stock: 150 }
-];
-
-fruits.forEach((fruit, index) => {
-    products.save(`fruit${index}`, fruit);
-});
-
-// Advanced queries
-const inStock = products.getWhere({ stock: { $gt: 0 } });
-const sortedByPrice = products.getAll('desc');
+### Error Recovery
+```typescript
+async function retryOperation<T>(
+    operation: () => Promise<T>,
+    maxRetries = 3
+): Promise<T> {
+    let lastError;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await operation();
+        } catch (error) {
+            lastError = error;
+            await new Promise(r => setTimeout(r, 1000 * (i + 1)));
+        }
+    }
+    throw lastError;
+}
 ```
 
 ---
@@ -185,6 +220,22 @@ const CONFIG = {
         FILE_LOGGING: true,     // บันทึกลงไฟล์ / File logging
         CONSOLE_LOGGING: true,  // แสดงในคอนโซล / Console logging
         LOG_FILE: 'msdb.log'    // ชื่อไฟล์ล็อก / Log filename
+    }
+};
+```
+
+## Configuration Best Practices
+
+```typescript
+const CONFIG = {
+    CACHE_LIMIT: 1000,        // Adjust based on memory
+    CACHE_SIZE_MB: 100,       // Set based on available RAM
+    AUTO_SAVE_INTERVAL: 1000, // More frequent saves
+    LOGGING: {
+        ENABLED: true,
+        DEBUG: process.env.NODE_ENV !== 'production',
+        FILE_LOGGING: true,
+        CONSOLE_LOGGING: process.env.NODE_ENV !== 'production'
     }
 };
 ```
