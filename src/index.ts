@@ -1,38 +1,56 @@
 import initializeDatabase from './msdb';
 
-// Initialize the database with debug mode
-const myDatabase = initializeDatabase('myDatabase');
-const myTable = myDatabase('myTable');
+// Define data types for type safety
+interface User {
+    name: string;
+    age: number;
+    email?: string;
+    createdAt: Date;
+}
 
-console.log('Starting database operations...');
+// Initialize database with types
+const db = initializeDatabase('exampleDB');
+const users = db<User>('users');
 
-// Save a batch of entries
-const entries = [
-  { id: 'entry1', data: { name: 'John Doe', age: 30 } },
-  { id: 'entry2', data: { name: 'Jane Doe', age: 25 } },
-  { id: 'entry3', data: { name: 'Bob Smith', age: 45 } }
+// Enable debug logging
+users.config.toggleDebug(true);
+
+console.log('🚀 Starting database operations...');
+
+// Example batch operations
+const usersData: User[] = [
+    {
+        name: 'John Doe',
+        age: 30,
+        email: 'john@example.com',
+        createdAt: new Date()
+    },
+    {
+        name: 'Jane Smith',
+        age: 25,
+        createdAt: new Date()
+    }
 ];
 
-entries.forEach(({ id, data }) => {
-  myTable.save(id, data);
+// Save users with auto-generated IDs
+usersData.forEach(userData => {
+    const id = `user_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    users.save(id, userData);
 });
 
-// Retrieve an entry by ID
-const retrievedEntry = myTable.find('entry1');
-console.log('Retrieved Entry:', retrievedEntry);
+// Demonstrate queries
+console.log('\n📊 Database Query Examples:');
 
-// Update an existing entry
-myTable.save('entry1', { name: 'John Doe', age: 31 });
+// Find users by age
+const age25Users = users.getWhere({ age: 25 });
+console.log('\n👥 Users aged 25:', age25Users);
 
-// Retrieve all entries with pagination
-const allEntries = myTable.getAll('asc');
-console.log('All Entries:', allEntries);
+// Get all users sorted
+const allUsers = users.getAll('asc');
+console.log('\n📋 All users (sorted):', allUsers);
 
-// Find entries with specific conditions
-const filteredEntries = myTable.getWhere({ age: 31 });
-console.log('Filtered Entries:', filteredEntries);
+// Get a random user
+const randomUser = users.random();
+console.log('\n🎲 Random user:', randomUser);
 
-// Remove an entry
-myTable.remove('entry1');
-
-console.log('Database operations completed.'); 
+console.log('\n✅ Database operations completed.');

@@ -1,7 +1,7 @@
 {
   "name": "base-msdb-ts",
-  "version": "1.0.0",
-  "description": "",
+  "version": "18.1.2A",
+  "description": "Database Manager create by RDTRC TEAM | MSDB is a json database low ram and cpu use on small database use like a mysql have database and table",
   "main": "index.ts",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
@@ -11,10 +11,6 @@
   "keywords": [],
   "author": "MakiShop.xyz",
   "license": "ISC",
-  "dependencies": {
-    "fs": "0.0.1-security",
-    "path": "^0.12.7"
-  },
   "devDependencies": {
     "@types/node": "^20.10.2"
   }

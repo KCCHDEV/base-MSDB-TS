@@ -1,51 +1,86 @@
 import initializeDatabase from './msdb';
 
-const myDatabase = initializeDatabase('largeTestDatabase');
-const myTable = myDatabase('largeTestTable');
-
-const numberOfEntries = 1000000;
-const batchSize = 2500; // Match the cache limit
-
-console.log(`Starting to insert ${numberOfEntries} entries in batches of ${batchSize}...`);
-console.time('Total Insertion Time');
-
-// Insert entries in batches
-for (let batch = 0; batch < Math.ceil(numberOfEntries / batchSize); batch++) {
-  console.time(`Batch ${batch + 1}`);
-  
-  const startIdx = batch * batchSize;
-  const endIdx = Math.min((batch + 1) * batchSize, numberOfEntries);
-  
-  for (let i = startIdx; i < endIdx; i++) {
-    const entryId = `entry${i}`;
-    myTable.save(entryId, {
-      name: `User ${i}`,
-      age: Math.floor(Math.random() * 100),
-      email: `user${i}@example.com`,
-      createdAt: new Date().toISOString()
-    });
-  }
-  
-  console.timeEnd(`Batch ${batch + 1}`);
-  console.log(`Processed entries ${startIdx} to ${endIdx - 1}`);
+// Define test data structure
+interface TestData {
+    name: string;
+    age: number;
+    email: string;
+    tags: string[];
+    active: boolean;
+    createdAt: string;
 }
 
-console.timeEnd('Total Insertion Time');
+// Initialize database
+const db = initializeDatabase('performanceTest');
+const testTable = db<TestData>('largeDataSet');
 
-// Verify data by sampling
-console.log('\nVerifying data with samples:');
-console.time('Sample Retrieval');
+// Test configuration
+const TEST_CONFIG = {
+    totalEntries: 1_000_000,
+    batchSize: 2500,
+    sampleSize: 1000
+};
 
-// Get first 5 entries
-const firstEntries = myTable.getAll('asc').slice(0, 5);
-console.log('First 5 entries:', firstEntries);
+console.log(`
+🔍 Performance Test Configuration:
+- Total Entries: ${TEST_CONFIG.totalEntries.toLocaleString()}
+- Batch Size: ${TEST_CONFIG.batchSize.toLocaleString()}
+- Sample Size: ${TEST_CONFIG.sampleSize.toLocaleString()}
+`);
 
-// Get some random entries
-const randomEntries = Array(5).fill(null).map(() => myTable.random());
-console.log('5 Random entries:', randomEntries);
+// Insertion test
+async function runInsertionTest() {
+    console.time('⏱️ Total Insertion');
+    
+    for (let batch = 0; Math.ceil(TEST_CONFIG.totalEntries / TEST_CONFIG.batchSize); batch++) {
+        const batchStart = Date.now();
+        const startIdx = batch * TEST_CONFIG.batchSize;
+        const endIdx = Math.min((batch + 1) * TEST_CONFIG.batchSize, TEST_CONFIG.totalEntries);
+        
+        for (let i = startIdx; i < endIdx; i++) {
+            testTable.save(`test_${i}`, {
+                name: `Test User ${i}`,
+                age: Math.floor(Math.random() * 80) + 18,
+                email: `user${i}@test.com`,
+                tags: [`tag${i % 10}`, `group${i % 5}`],
+                active: Math.random() > 0.5,
+                createdAt: new Date().toISOString()
+            });
+        }
+        
+        const batchTime = Date.now() - batchStart;
+        console.log(`Batch ${batch + 1}: ${endIdx - startIdx} entries in ${batchTime}ms (${Math.round((endIdx - startIdx) / (batchTime / 1000))} ops/sec)`);
+    }
+    
+    console.timeEnd('⏱️ Total Insertion');
+}
 
-// Test querying
-const youngUsers = myTable.getWhere({ age: 25 });
-console.log(`Found ${youngUsers.length} users aged 25`);
+// Query performance test
+async function runQueryTests() {
+    console.log('\n🔍 Running query tests...');
+    
+    // Test random access
+    console.time('Random Access (1000 entries)');
+    const randomResults = Array(1000).fill(null).map(() => testTable.random());
+    console.timeEnd('Random Access (1000 entries)');
+    
+    // Test condition query
+    console.time('Condition Query');
+    const activeUsers = testTable.getWhere({ active: true });
+    console.log(`Found ${activeUsers.length} active users`);
+    console.timeEnd('Condition Query');
+    
+    // Test sorting
+    console.time('Sort All Entries');
+    const sortedEntries = testTable.getAll('asc');
+    console.log(`Sorted ${sortedEntries.length} entries`);
+    console.timeEnd('Sort All Entries');
+}
 
-console.timeEnd('Sample Retrieval');
+// Run tests
+(async () => {
+    await runInsertionTest();
+    await runQueryTests();
+    console.log('\n✅ Performance tests completed');
+    process.exit(0);
+})();

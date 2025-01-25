@@ -1,92 +1,198 @@
 # 🗄️ base-MSDB-TS (MSDBTS V17)
 
-A lightweight, file-based database system for TypeScript projects with caching and debug capabilities.
-ระบบฐานข้อมูลแบบไฟล์ที่มีน้ำหนักเบาสำหรับโปรเจค TypeScript พร้อมระบบแคชและการดีบัก
+[English](#english-documentation) | [ภาษาไทย](#thai-documentation)
 
-## 📋 Requirements / ความต้องการระบบ
+Quick Navigation / การนำทางด่วน:
+- [Installation / การติดตั้ง](#installation--การติดตั้ง)
+- [Basic Usage / การใช้งานพื้นฐาน](#basic-usage--การใช้งานพื้นฐาน)
+- [Advanced Features / คุณสมบัติขั้นสูง](#advanced-features--คุณสมบัติขั้นสูง)
+- [Configuration / การตั้งค่า](#configuration--การตั้งค่า)
 
-Install one of the following package managers and required dependencies:
-ติดตั้งตัวจัดการแพ็คเกจตัวใดตัวหนึ่งและแพ็คเกจที่จำเป็น:
+---
 
+# English Documentation
+
+## Installation / การติดตั้ง
+
+1. Create a new TypeScript project:
 ```bash
-# Using npm
-npm i --save fs path @types/node
-
-# Using pnpm
-pnpm i --save fs path @types/node
-
-# Using bun
-bun i fs path @types/node
-
-# Using yarn
-yarn add fs path @types/node
+mkdir my-db-project
+cd my-db-project
+npm init -y
+npm install typescript @types/node --save-dev
 ```
 
-## 🚀 Features / คุณสมบัติ
+2. Copy the MSDB files:
+```bash
+src/
+  ├── msdb.ts       # Main database file
+  ├── index.ts      # Example usage
+  └── test_bigData.ts # Performance testing
+```
 
-- 📦 File-based storage / การจัดเก็บแบบไฟล์
-- 🔄 Automatic data partitioning / การแบ่งข้อมูลอัตโนมัติ
-- ⚡ Caching system / ระบบแคช
-- 🐛 Debug logging / การบันทึกการดีบัก
-- 🔍 Flexible querying / การค้นหาข้อมูลที่ยืดหยุ่น
+3. Configure TypeScript:
+```json
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "CommonJS",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true
+  }
+}
+```
 
-## 📖 Usage / วิธีการใช้งาน
-
-### Basic Example / ตัวอย่างการใช้งานพื้นฐาน
+## Basic Usage
 
 ```typescript
 import initializeDatabase from './msdb';
 
-// Initialize database / สร้างฐานข้อมูล
-const myDatabase = initializeDatabase('myDatabase');
-const myTable = myDatabase('myTable');
+// 1. Create a database
+const db = initializeDatabase('myShop');
 
-// Save data / บันทึกข้อมูล
-myTable.save('key1', { value: 'value1' });
-myTable.save('key2', { value: 'value2' });
-myTable.save('key3', { value: 'value3' });
+// 2. Define your data structure
+interface Product {
+    name: string;
+    price: number;
+    stock: number;
+}
 
-// Find entry / ค้นหาข้อมูล
-const foundEntry = myTable.find('key1');
-console.log('Found entry:', foundEntry);
+// 3. Create a table with type safety
+const products = db<Product>('products');
 
-// Remove entry / ลบข้อมูล
-myTable.remove('key2');
+// 4. Add data
+products.save('apple', {
+    name: 'Apple',
+    price: 0.5,
+    stock: 100
+});
 
-// Get random entry / ดึงข้อมูลแบบสุ่ม
-const randomEntry = myTable.random();
-
-// Get all entries (ascending) / ดึงข้อมูลทั้งหมด (เรียงจากน้อยไปมาก)
-const allEntriesAsc = myTable.getAll('asc');
-
-// Get all entries (descending) / ดึงข้อมูลทั้งหมด (เรียงจากมากไปน้อย)
-const allEntriesDesc = myTable.getAll('desc');
-
-// Query with condition / ค้นหาด้วยเงื่อนไข
-const condition = { value: 'value1' };
-const entriesWithCondition = myTable.getWhere(condition);
+// 5. Query data
+const apple = products.find('apple');
+const cheapProducts = products.getWhere({ price: 0.5 });
+const allProducts = products.getAll('asc');
 ```
 
-### 🔧 Advanced Features / คุณสมบัติขั้นสูง
+## Advanced Features
 
-#### Caching / ระบบแคช
-- Automatically caches up to 1000 entries
-- Flushes to disk when cache limit is reached
-- อัตโนมัติแคชสูงสุด 1000 รายการ
-- บันทึกลงดิสก์เมื่อถึงขีดจำกัดแคช
+```typescript
+// Enable logging
+products.config.toggleLogging(true);
+products.config.setLogFile('shop.log');
 
-#### Debug Logging / การบันทึกการดีบัก
-- Enable debug mode to log operations
-- Logs stored in debug.log file
-- เปิดใช้งานโหมดดีบักเพื่อบันทึกการทำงาน
-- บันทึกถูกเก็บในไฟล์ debug.log
+// Batch operations
+const fruits = [
+    { name: 'Orange', price: 0.6, stock: 80 },
+    { name: 'Banana', price: 0.3, stock: 150 }
+];
 
-## 🤝 Contributing / การมีส่วนร่วม
+fruits.forEach((fruit, index) => {
+    products.save(`fruit${index}`, fruit);
+});
 
-Contributions are welcome! Please feel free to submit a Pull Request.
-ยินดีรับการมีส่วนร่วม! โปรดส่ง Pull Request ได้อย่างอิสระ
+// Advanced queries
+const inStock = products.getWhere({ stock: { $gt: 0 } });
+const sortedByPrice = products.getAll('desc');
+```
 
-## 📄 License / ลิขสิทธิ์
+---
+
+# Thai Documentation
+
+## การติดตั้ง
+
+1. สร้างโปรเจค TypeScript ใหม่:
+```bash
+mkdir my-db-project
+cd my-db-project
+npm init -y
+npm install typescript @types/node --save-dev
+```
+
+2. คัดลอกไฟล์ MSDB:
+```bash
+src/
+  ├── msdb.ts       # ไฟล์ฐานข้อมูลหลัก
+  ├── index.ts      # ตัวอย่างการใช้งาน
+  └── test_bigData.ts # ทดสอบประสิทธิภาพ
+```
+
+## การใช้งานพื้นฐาน
+
+```typescript
+import initializeDatabase from './msdb';
+
+// 1. สร้างฐานข้อมูล
+const db = initializeDatabase('ร้านค้า');
+
+// 2. กำหนดโครงสร้างข้อมูล
+interface Product {
+    name: string;    // ชื่อสินค้า
+    price: number;   // ราคา
+    stock: number;   // จำนวนในสต็อก
+}
+
+// 3. สร้างตารางพร้อมการตรวจสอบประเภทข้อมูล
+const products = db<Product>('products');
+
+// 4. เพิ่มข้อมูล
+products.save('apple', {
+    name: 'แอปเปิ้ล',
+    price: 20,
+    stock: 100
+});
+
+// 5. ค้นหาข้อมูล
+const apple = products.find('apple');
+const cheapProducts = products.getWhere({ price: 20 });
+const allProducts = products.getAll('asc');
+```
+
+## คุณสมบัติขั้นสูง
+
+```typescript
+// เปิดการบันทึกล็อก
+products.config.toggleLogging(true);
+products.config.setLogFile('shop.log');
+
+// การทำงานแบบกลุ่ม
+const fruits = [
+    { name: 'ส้ม', price: 25, stock: 80 },
+    { name: 'กล้วย', price: 15, stock: 150 }
+];
+
+fruits.forEach((fruit, index) => {
+    products.save(`fruit${index}`, fruit);
+});
+
+// การค้นหาขั้นสูง
+const inStock = products.getWhere({ stock: { $gt: 0 } });
+const sortedByPrice = products.getAll('desc');
+```
+
+## การตั้งค่า / Configuration
+
+```typescript
+const CONFIG = {
+    PART_SIZE: 5000,      // จำนวนรายการต่อไฟล์ / Entries per file
+    CACHE_LIMIT: 1000,    // ขีดจำกัดแคช / Cache limit
+    CACHE_CHECK_INTERVAL: 30000,  // ตรวจสอบแคชทุก (มิลลิวินาที) / Cache check interval
+    LOGGING: {
+        ENABLED: true,          // เปิด/ปิดการบันทึกล็อก / Enable logging
+        DEBUG: true,            // โหมดดีบัก / Debug mode
+        FILE_LOGGING: true,     // บันทึกลงไฟล์ / File logging
+        CONSOLE_LOGGING: true,  // แสดงในคอนโซล / Console logging
+        LOG_FILE: 'msdb.log'    // ชื่อไฟล์ล็อก / Log filename
+    }
+};
+```
+
+## Contributing / การมีส่วนร่วม
+
+We welcome contributions! / ยินดีต้อนรับการมีส่วนร่วมในการพัฒนา!
+
+## License / ลิขสิทธิ์
 
 MIT License
-ลิขสิทธิ์ MIT
