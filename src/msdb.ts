@@ -1,14 +1,71 @@
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
-const PART_SIZE = 5000; // Number of entries per file part
-const DEBUG = true; // Set to true to enable debug logging
-const CACHE_LIMIT = 1000; // Cache limit before flushing to disk
-const CACHE_CHECK_INTERVAL = 30000; // 30 seconds
+interface DatabaseEntry<T = any> {
+    id: string;
+    value: T;
+}
 
-function logDebug(message: string) {
-    if (DEBUG) {
-        fs.appendFileSync('debug.log', `${new Date().toISOString()} - ${message}\n`);
+interface TableMethods<T = any> {
+    find: (id: string) => DatabaseEntry<T> | null;
+    save: (id: string, data: T) => void;
+    remove: (id: string) => void;
+    random: () => DatabaseEntry<T> | null;
+    getAll: (orderBy?: 'asc' | 'desc') => DatabaseEntry<T>[];
+    getWhere: (condition: Partial<T>) => DatabaseEntry<T>[];
+    config: {
+        toggleLogging: (enabled: boolean) => void;
+        toggleDebug: (enabled: boolean) => void;
+        setLogFile: (filename: string) => void;
+    };
+}
+
+const CONFIG = {
+    PART_SIZE: 5000,
+    CACHE_LIMIT: 1000,
+    CACHE_CHECK_INTERVAL: 30000,
+    LOGGING: {
+        ENABLED: true,
+        DEBUG: true,
+        FILE_LOGGING: true,
+        CONSOLE_LOGGING: true,
+        LOG_FILE: 'msdb.log'
+    }
+};
+
+enum LogLevel {
+    INFO = '📘 INFO',
+    ERROR = '❌ ERROR',
+    DEBUG = '🔍 DEBUG',
+    WARN = '⚠️ WARN'
+}
+
+function log(level: LogLevel, message: string, ...args: any[]) {
+    if (!CONFIG.LOGGING.ENABLED) return;
+    
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[MSDB 💾] ${timestamp} ${level}: ${message}`;
+    
+    if (args.length > 0) {
+        const data = args.map(arg => 
+            typeof arg === 'object' ? JSON.stringify(arg, null, 2) : arg
+        ).join(' ');
+        formattedMessage + ` | Data: ${data}`;
+    }
+
+    if (CONFIG.LOGGING.CONSOLE_LOGGING) {
+        console.log(formattedMessage);
+    }
+
+    if (CONFIG.LOGGING.FILE_LOGGING) {
+        fs.appendFileSync(CONFIG.LOGGING.LOG_FILE, formattedMessage + '\n');
+    }
+}
+
+// Replace the old logDebug function
+function logDebug(message: string, ...args: any[]) {
+    if (CONFIG.LOGGING.DEBUG) {
+        log(LogLevel.DEBUG, message, ...args);
     }
 }
 
@@ -17,27 +74,27 @@ function initializeDatabase(databaseName: string) {
 
     if (!fs.existsSync(databaseFolderPath)) {
         fs.mkdirSync(databaseFolderPath, { recursive: true });
-        console.log(`Created directory: ${databaseFolderPath}`);
+        log(LogLevel.INFO, `Created directory: ${databaseFolderPath}`);
     }
 
     const fullDatabaseFolderPath = path.join(databaseFolderPath, databaseName);
     if (!fs.existsSync(fullDatabaseFolderPath)) {
         fs.mkdirSync(fullDatabaseFolderPath, { recursive: true });
-        console.log(`Created directory: ${fullDatabaseFolderPath}`);
+        log(LogLevel.INFO, `Created directory: ${fullDatabaseFolderPath}`);
     }
 
-    return function initializeTable(tableName: string) {
+    return function initializeTable<T extends Record<string, any> = any>(tableName: string): TableMethods<T> {
         const tableFolderPath = path.join(fullDatabaseFolderPath, tableName);
         if (!fs.existsSync(tableFolderPath)) {
             fs.mkdirSync(tableFolderPath, { recursive: true });
         }
 
-        let tableData: Record<string, any> = loadTableData();
-        let cache = new Map<string, any>();
+        let tableData: Record<string, DatabaseEntry<T>> = loadTableData();
+        let cache = new Map<string, DatabaseEntry<T>>();
 
-        function loadTableData() {
+        function loadTableData(): Record<string, DatabaseEntry<T>> {
             const files = fs.readdirSync(tableFolderPath).filter((file) => file.endsWith('.json'));
-            const data: Record<string, any> = {};
+            const data: Record<string, DatabaseEntry<T>> = {};
 
             for (const file of files) {
                 const filePath = path.join(tableFolderPath, file);
@@ -45,45 +102,40 @@ function initializeDatabase(databaseName: string) {
                 Object.assign(data, fileData);
             }
 
-            logDebug(`Loaded table data for ${tableName}`);
+            log(LogLevel.INFO, `Loaded table data for ${tableName}`);
             return data;
         }
 
         async function saveTableData() {
-            const entries = Object.entries(tableData);
-            for (let i = 0; i < entries.length; i += PART_SIZE) {
-                const chunk = Object.fromEntries(entries.slice(i, i + PART_SIZE));
-                const filePath = path.join(tableFolderPath, `part_${Math.floor(i / PART_SIZE)}.json`);
-                if (fs.existsSync(filePath)) {
-                    console.log(`Overwriting existing file: ${filePath}`);
+            try {
+                const entries = Object.entries(tableData);
+                for (let i = 0; i < entries.length; i += CONFIG.PART_SIZE) {
+                    const chunk = Object.fromEntries(entries.slice(i, i + CONFIG.PART_SIZE));
+                    const filePath = path.join(tableFolderPath, `part_${Math.floor(i / CONFIG.PART_SIZE)}.json`);
+                    await fs.promises.writeFile(filePath, JSON.stringify(chunk, null, 2), 'utf8');
+                    log(LogLevel.INFO, `Saved data chunk to ${filePath}`);
                 }
-                await fs.promises.writeFile(filePath, JSON.stringify(chunk, null, 2), 'utf8');
-                console.log(`Saved data to file: ${filePath}`);
+            } catch (error: any) {
+                log(LogLevel.ERROR, `Failed to save table data: ${error.message}`);
+                throw error;
             }
-
-            const existingFiles = fs.readdirSync(tableFolderPath).filter((file) => file.startsWith('part_'));
-            const requiredFileCount = Math.ceil(entries.length / PART_SIZE);
-            for (const file of existingFiles.slice(requiredFileCount)) {
-                fs.unlinkSync(path.join(tableFolderPath, file));
-            }
-
-            logDebug(`Saved table data for ${tableName}`);
         }
 
-        function saveEntry(id: string, data: any) {
+        function saveEntry(id: string | undefined, data: T): void {
             try {
                 const entryId = id || generateUniqueId();
-                tableData[entryId] = { id: entryId, value: data };
-                cache.set(entryId, tableData[entryId]);
+                const entry: DatabaseEntry<T> = { id: entryId, value: data };
+                tableData[entryId] = entry;
+                cache.set(entryId, entry);
                 logDebug(`Added entry ${entryId} to cache`);
 
-                if (cache.size >= CACHE_LIMIT) {
+                if (cache.size >= CONFIG.CACHE_LIMIT) {
                     saveTableData();
                     cache.clear();
                     logDebug(`Cache flushed for ${tableName}`);
                 }
             } catch (error) {
-                console.error('Error saving entry:', error);
+                log(LogLevel.ERROR, 'Error saving entry:', error);
                 throw error;
             }
         }
@@ -92,7 +144,7 @@ function initializeDatabase(databaseName: string) {
             if (cache.size > 0) {
                 logDebug(`Cache contents for ${tableName}: ${JSON.stringify(Array.from(cache.entries()), null, 2)}`);
             }
-        }, CACHE_CHECK_INTERVAL);
+        }, CONFIG.CACHE_CHECK_INTERVAL);
 
         function removeEntry(id: string) {
             if (tableData[id]) {
@@ -102,24 +154,24 @@ function initializeDatabase(databaseName: string) {
             }
         }
 
-        function getEntry(id: string) {
+        function getEntry(id: string): DatabaseEntry<T> | null {
             if (cache.has(id)) {
                 logDebug(`Retrieved entry ${id} from cache`);
-                return cache.get(id);
+                return cache.get(id) || null;
             }
             const entry = tableData[id] || null;
             logDebug(`Retrieved entry ${id} from ${tableName}`);
             return entry;
         }
 
-        function getAllEntries(orderBy = 'asc') {
+        function getAllEntries(orderBy = 'asc'): DatabaseEntry<T>[] {
             const entries = [...cache.values(), ...Object.values(tableData)];
             const result = entries.sort((a, b) => (orderBy === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id)));
             logDebug(`Retrieved all entries from ${tableName} ordered by ${orderBy}`);
             return result;
         }
 
-        function getWhere(condition: { [key: string]: any }) {
+        function getWhere(condition: Partial<T>): DatabaseEntry<T>[] {
             const result = [...cache.values(), ...Object.values(tableData)].filter((entry) => {
                 for (const key in condition) {
                     if (entry.value[key] !== condition[key]) return false;
@@ -130,7 +182,7 @@ function initializeDatabase(databaseName: string) {
             return result;
         }
 
-        function getRandomEntry() {
+        function getRandomEntry(): DatabaseEntry<T> | null {
             const allEntries = [...cache.keys(), ...Object.keys(tableData)];
             if (allEntries.length === 0) return null;
             const randomKey = allEntries[Math.floor(Math.random() * allEntries.length)];
@@ -141,16 +193,36 @@ function initializeDatabase(databaseName: string) {
 
         function saveCacheOnExit() {
             if (cache.size > 0) {
-                console.log('Saving cache to disk on exit...');
-                saveTableData();
-                cache.clear();
+                log(LogLevel.WARN, 'Saving cache to disk before exit...');
+                try {
+                    const entries = Object.entries(tableData);
+                    for (let i = 0; i < entries.length; i += CONFIG.PART_SIZE) {
+                        const chunk = Object.fromEntries(entries.slice(i, i + CONFIG.PART_SIZE));
+                        const filePath = path.join(tableFolderPath, `part_${Math.floor(i / CONFIG.PART_SIZE)}.json`);
+                        fs.writeFileSync(filePath, JSON.stringify(chunk, null, 2), 'utf8');
+                    }
+                    cache.clear();
+                    log(LogLevel.INFO, 'Cache saved successfully');
+                } catch (error) {
+                    log(LogLevel.ERROR, 'Error saving cache during exit:', error);
+                    process.exit(1);
+                }
             }
         }
 
-        process.on('exit', saveCacheOnExit);
-        process.on('SIGINT', () => {
+        function cleanupAndExit(exitCode = 0) {
+            log(LogLevel.INFO, 'Application shutting down...');
             saveCacheOnExit();
-            process.exit();
+            process.exit(exitCode);
+        }
+
+        process.on('exit', saveCacheOnExit);
+        process.on('SIGINT', () => cleanupAndExit());
+        process.on('SIGTERM', () => cleanupAndExit());
+        process.on('SIGHUP', () => cleanupAndExit());
+        process.on('uncaughtException', (error) => {
+            log(LogLevel.ERROR, 'Uncaught Exception:', error);
+            cleanupAndExit(1);
         });
 
         return {
@@ -160,6 +232,20 @@ function initializeDatabase(databaseName: string) {
             random: getRandomEntry,
             getAll: getAllEntries,
             getWhere: getWhere,
+            config: {
+                toggleLogging: (enabled: boolean) => {
+                    CONFIG.LOGGING.ENABLED = enabled;
+                    log(LogLevel.INFO, `Logging ${enabled ? 'enabled' : 'disabled'}`);
+                },
+                toggleDebug: (enabled: boolean) => {
+                    CONFIG.LOGGING.DEBUG = enabled;
+                    log(LogLevel.INFO, `Debug logging ${enabled ? 'enabled' : 'disabled'}`);
+                },
+                setLogFile: (filename: string) => {
+                    CONFIG.LOGGING.LOG_FILE = filename;
+                    log(LogLevel.INFO, `Log file set to ${filename}`);
+                }
+            }
         };
     };
 }
