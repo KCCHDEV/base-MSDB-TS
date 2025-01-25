@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+// Defines the structure of database entries with optional type T
 interface DatabaseEntry<T = any> {
     id: string;
     value: T;
 }
 
+// Available methods for interacting with database tables
 interface TableMethods<T = any> {
     find: (id: string) => DatabaseEntry<T> | null;
     save: (id: string, data: T) => void;
@@ -20,19 +22,21 @@ interface TableMethods<T = any> {
     };
 }
 
+// Configuration settings for database behavior
 const CONFIG = {
-    PART_SIZE: 5000,
-    CACHE_LIMIT: 1000,
-    CACHE_CHECK_INTERVAL: 30000,
+    PART_SIZE: 5000,      // Maximum entries per file
+    CACHE_LIMIT: 1000,    // Maximum entries in memory before writing to disk
+    CACHE_CHECK_INTERVAL: 30000,  // How often to check cache (in ms)
     LOGGING: {
-        ENABLED: true,
-        DEBUG: true,
-        FILE_LOGGING: true,
-        CONSOLE_LOGGING: true,
-        LOG_FILE: 'msdb.log'
+        ENABLED: true,          // Master switch for logging
+        DEBUG: true,            // Enables detailed debug logs
+        FILE_LOGGING: true,     // Save logs to file
+        CONSOLE_LOGGING: true,  // Show logs in console
+        LOG_FILE: 'msdb.log'    // Log file name
     }
 };
 
+// Log message types with emojis for better visibility
 enum LogLevel {
     INFO = '📘 INFO',
     ERROR = '❌ ERROR',
@@ -40,6 +44,7 @@ enum LogLevel {
     WARN = '⚠️ WARN'
 }
 
+// Main logging function that handles both console and file logging
 function log(level: LogLevel, message: string, ...args: any[]) {
     if (!CONFIG.LOGGING.ENABLED) return;
     
@@ -69,7 +74,12 @@ function logDebug(message: string, ...args: any[]) {
     }
 }
 
+/**
+ * Initialize a new database instance
+ * @param databaseName Name of the database to create/open
+ */
 function initializeDatabase(databaseName: string) {
+    // Create database directory structure if it doesn't exist
     const databaseFolderPath = './Database[LOCAL]';
 
     if (!fs.existsSync(databaseFolderPath)) {
@@ -83,15 +93,25 @@ function initializeDatabase(databaseName: string) {
         log(LogLevel.INFO, `Created directory: ${fullDatabaseFolderPath}`);
     }
 
+    /**
+     * Initialize a new table in the database
+     * @param tableName Name of the table to create/open
+     * @returns Object containing table operation methods
+     */
     return function initializeTable<T extends Record<string, any> = any>(tableName: string): TableMethods<T> {
         const tableFolderPath = path.join(fullDatabaseFolderPath, tableName);
         if (!fs.existsSync(tableFolderPath)) {
             fs.mkdirSync(tableFolderPath, { recursive: true });
         }
 
+        // Table data storage - combination of disk and memory cache
         let tableData: Record<string, DatabaseEntry<T>> = loadTableData();
         let cache = new Map<string, DatabaseEntry<T>>();
 
+        /**
+         * Load existing table data from disk
+         * Combines all part files into single data object
+         */
         function loadTableData(): Record<string, DatabaseEntry<T>> {
             const files = fs.readdirSync(tableFolderPath).filter((file) => file.endsWith('.json'));
             const data: Record<string, DatabaseEntry<T>> = {};
@@ -106,6 +126,10 @@ function initializeDatabase(databaseName: string) {
             return data;
         }
 
+        /**
+         * Save current table data to disk in parts
+         * Splits data into chunks to handle large datasets
+         */
         async function saveTableData() {
             try {
                 const entries = Object.entries(tableData);
@@ -121,6 +145,11 @@ function initializeDatabase(databaseName: string) {
             }
         }
 
+        /**
+         * Save a new entry to the table
+         * @param id Optional custom ID, generates random ID if not provided
+         * @param data The data to store
+         */
         function saveEntry(id: string | undefined, data: T): void {
             try {
                 const entryId = id || generateUniqueId();
@@ -140,12 +169,17 @@ function initializeDatabase(databaseName: string) {
             }
         }
 
+        // Periodic cache inspection for debugging
         setInterval(() => {
             if (cache.size > 0) {
                 logDebug(`Cache contents for ${tableName}: ${JSON.stringify(Array.from(cache.entries()), null, 2)}`);
             }
         }, CONFIG.CACHE_CHECK_INTERVAL);
 
+        /**
+         * Remove an entry from the table
+         * @param id ID of the entry to remove
+         */
         function removeEntry(id: string) {
             if (tableData[id]) {
                 delete tableData[id];
@@ -154,6 +188,10 @@ function initializeDatabase(databaseName: string) {
             }
         }
 
+        /**
+         * Retrieve an entry by its ID
+         * Checks cache first, then disk storage
+         */
         function getEntry(id: string): DatabaseEntry<T> | null {
             if (cache.has(id)) {
                 logDebug(`Retrieved entry ${id} from cache`);
@@ -164,6 +202,10 @@ function initializeDatabase(databaseName: string) {
             return entry;
         }
 
+        /**
+         * Get all entries with optional sorting
+         * @param orderBy Sort direction ('asc' or 'desc')
+         */
         function getAllEntries(orderBy = 'asc'): DatabaseEntry<T>[] {
             const entries = [...cache.values(), ...Object.values(tableData)];
             const result = entries.sort((a, b) => (orderBy === 'asc' ? a.id.localeCompare(b.id) : b.id.localeCompare(a.id)));
@@ -171,6 +213,10 @@ function initializeDatabase(databaseName: string) {
             return result;
         }
 
+        /**
+         * Find entries matching a condition
+         * @param condition Object with key-value pairs to match against
+         */
         function getWhere(condition: Partial<T>): DatabaseEntry<T>[] {
             const result = [...cache.values(), ...Object.values(tableData)].filter((entry) => {
                 for (const key in condition) {
@@ -182,6 +228,9 @@ function initializeDatabase(databaseName: string) {
             return result;
         }
 
+        /**
+         * Get a random entry from the table
+         */
         function getRandomEntry(): DatabaseEntry<T> | null {
             const allEntries = [...cache.keys(), ...Object.keys(tableData)];
             if (allEntries.length === 0) return null;
@@ -191,6 +240,7 @@ function initializeDatabase(databaseName: string) {
             return entry;
         }
 
+        // Data safety: Save cache before program exits
         function saveCacheOnExit() {
             if (cache.size > 0) {
                 log(LogLevel.WARN, 'Saving cache to disk before exit...');
@@ -210,12 +260,14 @@ function initializeDatabase(databaseName: string) {
             }
         }
 
+        // Clean shutdown handler
         function cleanupAndExit(exitCode = 0) {
             log(LogLevel.INFO, 'Application shutting down...');
             saveCacheOnExit();
             process.exit(exitCode);
         }
 
+        // Register process event handlers for safe shutdown
         process.on('exit', saveCacheOnExit);
         process.on('SIGINT', () => cleanupAndExit());
         process.on('SIGTERM', () => cleanupAndExit());
@@ -225,14 +277,16 @@ function initializeDatabase(databaseName: string) {
             cleanupAndExit(1);
         });
 
+        // Return public table methods
         return {
-            find: getEntry,
-            save: saveEntry,
-            remove: removeEntry,
-            random: getRandomEntry,
-            getAll: getAllEntries,
-            getWhere: getWhere,
+            find: getEntry,          // Find entry by ID
+            save: saveEntry,         // Save new entry
+            remove: removeEntry,     // Remove entry by ID
+            random: getRandomEntry,  // Get random entry
+            getAll: getAllEntries,   // Get all entries
+            getWhere: getWhere,     // Find entries by condition
             config: {
+                // Runtime configuration methods
                 toggleLogging: (enabled: boolean) => {
                     CONFIG.LOGGING.ENABLED = enabled;
                     log(LogLevel.INFO, `Logging ${enabled ? 'enabled' : 'disabled'}`);
@@ -250,6 +304,10 @@ function initializeDatabase(databaseName: string) {
     };
 }
 
+/**
+ * Generate a random unique identifier
+ * @returns Random string ID
+ */
 function generateUniqueId() {
     return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
