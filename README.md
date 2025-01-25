@@ -1,249 +1,305 @@
-# 🗄️ base-MSDB-TS (MSDBTS V17)
+# 🗄️ base-MSDB-TS (MSDBTS V18)
 
 [English](#english-documentation) | [ภาษาไทย](#thai-documentation)
 
-## Latest Updates (V17)
-- Added file locking mechanism for better concurrency
-- Improved error handling and recovery
-- Enhanced batch operations
-- Better memory management
-- New transaction-like batch operations
+## Latest Updates (V18)
+- Enhanced file management with 2500 entries per file limit
+- Improved caching system with memory optimization
+- Added queue-based save operations
+- Better error handling and recovery
+- File-based data partitioning
 
-## Performance Recommendations
-- Use batch operations for multiple saves
-- Enable proper logging in production
-- Configure cache size based on your needs
-- Use proper error handling
-- Implement cooldown periods between large operations
+## Key Features
+- Type-safe database operations
+- Automatic file partitioning (2500 entries per file)
+- In-memory caching with disk persistence
+- Batch operations support
+- Async/await API
+- Comprehensive error handling
+- Built-in retry mechanism
+- Memory usage optimization
 
-Quick Navigation / การนำทางด่วน:
-- [Installation / การติดตั้ง](#installation--การติดตั้ง)
-- [Basic Usage / การใช้งานพื้นฐาน](#basic-usage--การใช้งานพื้นฐาน)
-- [Advanced Features / คุณสมบัติขั้นสูง](#advanced-features--คุณสมบัติขั้นสูง)
-- [Configuration / การตั้งค่า](#configuration--การตั้งค่า)
-
----
-
-# English Documentation
-
-## Installation / การติดตั้ง
-
-```bash
-npm install base-msdb-ts
-```
-
-1. Create a new TypeScript project:
-```bash
-mkdir my-db-project
-cd my-db-project
-npm init -y
-npm install typescript @types/node --save-dev
-```
-
-2. Copy the MSDB files:
-```bash
-src/
-  ├── msdb.ts       # Main database file
-  ├── index.ts      # Example usage
-  └── test_bigData.ts # Performance testing
-```
-
-3. Configure TypeScript:
-```json
-{
-  "compilerOptions": {
-    "target": "ES2020",
-    "module": "CommonJS",
-    "strict": true,
-    "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true
-  }
-}
-```
-
-## Basic Usage with Error Handling
-
+## Quick Start
 ```typescript
 import initializeDatabase from 'base-msdb-ts';
 
-// Define your data structure
 interface User {
     name: string;
     age: number;
-    email?: string;
 }
 
-// Initialize with error handling
-try {
-    const db = initializeDatabase('myApp');
-    const users = db<User>('users');
+const db = initializeDatabase('myDatabase');
+const users = db<User>('users');
 
-    // Configure for your needs
-    users.config.setCacheLimit(1000);
-    users.config.setCacheSizeMB(100);
+// Save data
+await users.save('user1', { name: 'John', age: 30 });
 
-    // Save with proper error handling
-    await users.save('user1', {
-        name: 'John',
-        age: 30,
-        email: 'john@example.com'
-    });
-} catch (error) {
-    console.error('Database operation failed:', error);
-}
+// Query data
+const user = await users.find('user1');
+const allUsers = users.getAll();
+const youngUsers = users.getWhere({ age: 25 });
 ```
 
-## Advanced Features
-
-### Batch Operations
+## Configuration
 ```typescript
-async function batchSave(users: User[]) {
-    const results = [];
+const CONFIG = {
+    FILE_SETTINGS: {
+        MAX_ENTRIES_PER_FILE: 2500,  // Entries per file
+        FILE_PREFIX: 'data',         // File prefix
+        MAX_FILES: 1000,             // Maximum number of files
+    },
+    CACHE: {
+        SIZE: 100,                   // Cache size in entries
+        LIMIT_MB: 100,              // Cache limit in MB
+        CHECK_INTERVAL: 5000,        // Cache check interval (ms)
+        SAVE_INTERVAL: 1000         // Save interval (ms)
+    }
+};
+```
+
+## Performance Tips
+1. Batch Operations:
+```typescript
+const batchSave = async (users: User[]) => {
     for (const user of users) {
-        try {
-            await users.save(generateId(), user);
-            results.push(true);
-        } catch (error) {
-            results.push(false);
-            console.error('Failed to save user:', error);
-        }
+        await users.save(generateId(), user);
     }
-    return results;
+};
+```
+
+2. Error Handling:
+```typescript
+try {
+    await users.save('user1', data);
+} catch (error) {
+    if (error instanceof DatabaseError) {
+        // Handle database errors
+    }
 }
 ```
 
-### Error Recovery
+3. Memory Management:
 ```typescript
-async function retryOperation<T>(
-    operation: () => Promise<T>,
-    maxRetries = 3
-): Promise<T> {
-    let lastError;
-    for (let i = 0; i < maxRetries; i++) {
-        try {
-            return await operation();
-        } catch (error) {
-            lastError = error;
-            await new Promise(r => setTimeout(r, 1000 * (i + 1)));
-        }
-    }
-    throw lastError;
-}
+users.config.setCacheLimit(1000);     // Set cache limit
+users.config.setCacheSizeMB(100);     // Set memory limit
 ```
 
----
+## Best Practices
+1. Use proper types for data structures
+2. Implement error handling
+3. Use batch operations for multiple saves
+4. Monitor memory usage
+5. Configure cache based on your needs
 
-# Thai Documentation
+## API Reference
+- `save(id: string, data: T)`: Save data
+- `find(id: string)`: Find by ID
+- `getAll(orderBy?: 'asc' | 'desc')`: Get all entries
+- `getWhere(condition: Partial<T>)`: Query with condition
+- `remove(id: string)`: Remove entry
+- `random()`: Get random entry
 
-## การติดตั้ง
+# English Documentation
 
-1. สร้างโปรเจค TypeScript ใหม่:
-```bash
-mkdir my-db-project
-cd my-db-project
-npm init -y
-npm install typescript @types/node --save-dev
-```
+## Advanced Usage Examples
 
-2. คัดลอกไฟล์ MSDB:
-```bash
-src/
-  ├── msdb.ts       # ไฟล์ฐานข้อมูลหลัก
-  ├── index.ts      # ตัวอย่างการใช้งาน
-  └── test_bigData.ts # ทดสอบประสิทธิภาพ
-```
-
-## การใช้งานพื้นฐาน
-
+### 1. Auto-Create Data if Not Found
 ```typescript
-import initializeDatabase from './msdb';
-
-// 1. สร้างฐานข้อมูล
-const db = initializeDatabase('ร้านค้า');
-
-// 2. กำหนดโครงสร้างข้อมูล
 interface Product {
+    id: string;
+    name: string;
+    price: number;
+    stock: number;
+}
+
+const db = initializeDatabase('shop');
+const products = db<Product>('products');
+
+async function getOrCreateProduct(id: string, defaultData?: Partial<Product>): Promise<Product> {
+    const existing = await products.find(id);
+    if (existing) return existing.value;
+
+    const newProduct = {
+        id,
+        name: defaultData?.name || 'New Product',
+        price: defaultData?.price || 0,
+        stock: defaultData?.stock || 0
+    };
+
+    await products.save(id, newProduct);
+    return newProduct;
+}
+
+// Usage
+const product = await getOrCreateProduct('apple', { name: 'Apple', price: 0.5 });
+```
+
+### 2. Batch Processing with Progress
+```typescript
+async function batchProcess<T>(items: T[], batchSize = 50) {
+    const results = [];
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        const promises = batch.map(item => products.save(item.id, item));
+        await Promise.all(promises);
+        console.log(`Processed ${i + batch.length}/${items.length}`);
+    }
+}
+```
+
+### 3. Search with Multiple Conditions
+```typescript
+interface SearchParams {
+    minPrice?: number;
+    maxPrice?: number;
+    inStock?: boolean;
+}
+
+function searchProducts(params: SearchParams) {
+    return products.getAll().filter(product => {
+        if (params.minPrice && product.value.price < params.minPrice) return false;
+        if (params.maxPrice && product.value.price > params.maxPrice) return false;
+        if (params.inStock && product.value.stock <= 0) return false;
+        return true;
+    });
+}
+```
+
+### 4. Auto-Incrementing IDs
+```typescript
+async function getNextId(prefix: string): Promise<string> {
+    const all = products.getAll();
+    const existing = all
+        .map(e => e.id)
+        .filter(id => id.startsWith(prefix))
+        .map(id => parseInt(id.replace(prefix, '')));
+    
+    const nextNum = Math.max(0, ...existing) + 1;
+    return `${prefix}${nextNum.toString().padStart(6, '0')}`;
+}
+
+// Usage
+const newId = await getNextId('PROD');  // Returns: PROD000001
+```
+
+# ภาษาไทย
+
+## ตัวอย่างการใช้งานขั้นสูง
+
+### 1. ระบบสร้างข้อมูลอัตโนมัติเมื่อไม่พบข้อมูล
+```typescript
+// ตัวอย่างการสร้างข้อมูลสินค้าอัตโนมัติ
+interface Product {
+    id: string;
     name: string;    // ชื่อสินค้า
     price: number;   // ราคา
     stock: number;   // จำนวนในสต็อก
 }
 
-// 3. สร้างตารางพร้อมการตรวจสอบประเภทข้อมูล
+const db = initializeDatabase('shop');
 const products = db<Product>('products');
 
-// 4. เพิ่มข้อมูล
-products.save('apple', {
-    name: 'แอปเปิ้ล',
+// ฟังก์ชันสำหรับค้นหาหรือสร้างสินค้าใหม่
+async function getOrCreateProduct(id: string, defaults?: Partial<Product>): Promise<Product> {
+    const existing = await products.find(id);
+    if (existing) return existing.value;
+
+    // สร้างสินค้าใหม่ถ้าไม่พบ
+    const newProduct = {
+        id,
+        name: defaults?.name || 'New Product',
+        price: defaults?.price || 0,
+        stock: defaults?.stock || 0
+    };
+
+    await products.save(id, newProduct);
+    return newProduct;
+}
+
+// ตัวอย่างการใช้งาน
+const product = await getOrCreateProduct('apple', { 
+    name: 'Apple', 
     price: 20,
-    stock: 100
+    stock: 100 
 });
-
-// 5. ค้นหาข้อมูล
-const apple = products.find('apple');
-const cheapProducts = products.getWhere({ price: 20 });
-const allProducts = products.getAll('asc');
 ```
 
-## คุณสมบัติขั้นสูง
-
+### 2. การประมวลผลแบบชุดพร้อมแสดงความคืบหน้า
 ```typescript
-// เปิดการบันทึกล็อก
-products.config.toggleLogging(true);
-products.config.setLogFile('shop.log');
+// ฟังก์ชันสำหรับบันทึกข้อมูลเป็นชุด
+async function processBatch<T>(items: T[], batchSize = 50) {
+    // แสดงความคืบหน้าการทำงาน
+    const total = items.length;
+    let processed = 0;
 
-// การทำงานแบบกลุ่ม
-const fruits = [
-    { name: 'ส้ม', price: 25, stock: 80 },
-    { name: 'กล้วย', price: 15, stock: 150 }
-];
+    // แบ่งการทำงานเป็นชุด
+    for (let i = 0; i < items.length; i += batchSize) {
+        const batch = items.slice(i, i + batchSize);
+        
+        // บันทึกข้อมูลพร้อมกัน
+        await Promise.all(
+            batch.map(item => products.save(item.id, item))
+        );
 
-fruits.forEach((fruit, index) => {
-    products.save(`fruit${index}`, fruit);
+        // อัพเดทและแสดงความคืบหน้า
+        processed += batch.length;
+        console.log(`ดำเนินการแล้ว: ${processed}/${total}`);
+    }
+}
+```
+
+### 3. การค้นหาด้วยเงื่อนไขหลายอย่าง
+```typescript
+// กำหนดเงื่อนไขการค้นหา
+interface SearchCriteria {
+    minPrice?: number;   // ราคาต่ำสุด
+    maxPrice?: number;   // ราคาสูงสุด
+    inStock?: boolean;   // มีในสต็อก
+}
+
+// ฟังก์ชันค้นหาสินค้า
+function searchProducts(criteria: SearchCriteria) {
+    return products.getAll().filter(product => {
+        // ตรวจสอบเงื่อนไขทั้งหมด
+        if (criteria.minPrice && product.value.price < criteria.minPrice) return false;
+        if (criteria.maxPrice && product.value.price > criteria.maxPrice) return false;
+        if (criteria.inStock && product.value.stock <= 0) return false;
+        return true;
+    });
+}
+
+// ตัวอย่างการใช้งาน
+const results = searchProducts({
+    minPrice: 10,
+    maxPrice: 100,
+    inStock: true
 });
-
-// การค้นหาขั้นสูง
-const inStock = products.getWhere({ stock: { $gt: 0 } });
-const sortedByPrice = products.getAll('desc');
 ```
 
-## การตั้งค่า / Configuration
-
+### 4. ระบบสร้างรหัสอัตโนมัติ
 ```typescript
-const CONFIG = {
-    PART_SIZE: 5000,      // จำนวนรายการต่อไฟล์ / Entries per file
-    CACHE_LIMIT: 1000,    // ขีดจำกัดแคช / Cache limit
-    CACHE_CHECK_INTERVAL: 30000,  // ตรวจสอบแคชทุก (มิลลิวินาที) / Cache check interval
-    LOGGING: {
-        ENABLED: true,          // เปิด/ปิดการบันทึกล็อก / Enable logging
-        DEBUG: true,            // โหมดดีบัก / Debug mode
-        FILE_LOGGING: true,     // บันทึกลงไฟล์ / File logging
-        CONSOLE_LOGGING: true,  // แสดงในคอนโซล / Console logging
-        LOG_FILE: 'msdb.log'    // ชื่อไฟล์ล็อก / Log filename
-    }
-};
+// ฟังก์ชันสร้างรหัสถัดไป
+async function generateNextId(prefix: string): Promise<string> {
+    const all = products.getAll();
+    
+    // หารหัสล่าสุด
+    const lastId = all
+        .map(e => e.id)
+        .filter(id => id.startsWith(prefix))
+        .map(id => parseInt(id.replace(prefix, '')))
+        .reduce((max, curr) => Math.max(max, curr), 0);
+
+    // สร้างรหัสใหม่
+    const nextNum = lastId + 1;
+    return `${prefix}${nextNum.toString().padStart(6, '0')}`;
+}
+
+// ตัวอย่างการใช้งาน
+const newId = await generateNextId('PROD');  // จะได้: PROD000001
 ```
 
-## Configuration Best Practices
+## Contributing
+Issues and PRs welcome!
 
-```typescript
-const CONFIG = {
-    CACHE_LIMIT: 1000,        // Adjust based on memory
-    CACHE_SIZE_MB: 100,       // Set based on available RAM
-    AUTO_SAVE_INTERVAL: 1000, // More frequent saves
-    LOGGING: {
-        ENABLED: true,
-        DEBUG: process.env.NODE_ENV !== 'production',
-        FILE_LOGGING: true,
-        CONSOLE_LOGGING: process.env.NODE_ENV !== 'production'
-    }
-};
-```
-
-## Contributing / การมีส่วนร่วม
-
-We welcome contributions! / ยินดีต้อนรับการมีส่วนร่วมในการพัฒนา!
-
-## License / ลิขสิทธิ์
-
+## License
 MIT License
