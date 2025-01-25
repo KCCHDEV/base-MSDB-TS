@@ -12,6 +12,8 @@
   "author": "MakiShop.xyz",
   "license": "ISC",
   "devDependencies": {
-    "@types/node": "^20.10.2"
+    "@types/node": "^22.10.10",
+    "tsc": "^2.0.4",
+    "typescript": "^5.7.3"
   }
 }
