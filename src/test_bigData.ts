@@ -37,8 +37,12 @@ async function runTest() {
     const testTable = db<TestData>('largeDataSet');
     
     // Configure for performance
-    testTable.config.setCacheQueueSize(5000);
     testTable.config.setCacheSizeMB(500);
+    testTable.config.setTableConfig({
+        enableCache: true,
+        maxCacheSize: 5000,
+        enableIndices: true
+    });
     
     const metrics: PerformanceMetrics = {
         totalTime: 0,
@@ -125,12 +129,12 @@ async function runTest() {
         console.timeEnd('Random Access');
         
         console.time('Condition Query');
-        const activeUsers = testTable.getWhere({ active: true });
+        const activeUsers = await testTable.getWhere({ active: true });
         console.log(`Found ${activeUsers.length} active users`);
         console.timeEnd('Condition Query');
         
         console.time('Sort Test');
-        const sortedEntries = testTable.getAll('asc');
+        const sortedEntries = await testTable.getAll({ orderBy: 'id', order: 'asc' });
         console.log(`Sorted ${sortedEntries.length} entries`);
         console.timeEnd('Sort Test');
     }
