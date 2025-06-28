@@ -81,7 +81,7 @@ async function main() {
         // Ensure all operations are properly awaited
         const queryResults = await Promise.all([
             users.getWhere({ age: 25 }),
-            users.getAll('asc'),
+            users.getAll({ orderBy: 'id', order: 'asc' }),
             users.random()
         ]);
 
